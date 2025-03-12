@@ -181,3 +181,12 @@ class async_backend:
     async def run(self, func, *args, **kwargs):
         new_func = self(func)
         return new_func(*args, **kwargs)
+    
+
+def get_backend_models():
+    for model in llm.get_models():
+        print(model.model_id)
+
+def get_async_backend_models():
+    for model in llm.get_async_models():
+        print(model.model_id)
