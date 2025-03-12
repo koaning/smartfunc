@@ -3,7 +3,12 @@ name = "smartfunc"
 version = "0.1.0"
 description = "A Python project"
 authors = []
-dependencies = []
+dependencies = [
+    "pydantic>=2.0.0",
+    "jinja2>=3.0.0",
+    "diskcache>=5.0.0",
+    "llm"
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -13,3 +18,9 @@ build-backend = "hatchling.build"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",  # For async tests
+]
