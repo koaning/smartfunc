@@ -1,4 +1,6 @@
+from pydantic import BaseModel
 import pytest 
+
 from smartfunc import backend
 
 
@@ -10,3 +12,17 @@ def test_basic(text):
         pass
 
     assert text in generate_summary(text) 
+
+
+
+def test_schema_error():
+    with pytest.raises(ValueError):
+        class OutputModel(BaseModel):
+            result: str
+
+        @backend("markov", delay=0, length=10)
+        def generate_summary(t) -> OutputModel:
+            """Generate a summary of the following text: {{ t }}"""
+            pass
+
+        generate_summary("Hello, world!")
