@@ -24,7 +24,7 @@ def generate_summary(text: str):
     pass
 ```
 
-The `generate_summary` function will now return a string with the summary of the text.
+The `generate_summary` function will now return a string with the summary of the text that you give it.
 
 ## How does it work?
 
