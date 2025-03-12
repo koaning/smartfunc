@@ -1,18 +1,17 @@
 from pydantic import BaseModel
 import pytest 
 
-from smartfunc import backend
+from smartfunc import backend, async_backend
 
 
 @pytest.mark.parametrize("text", ["Hello, world!", "Hello, programmer!"])
 def test_basic(text):
-    @backend("markov", delay=0, length=10)
+    @backend("markov")
     def generate_summary(t):
         """Generate a summary of the following text: {{ t }}"""
         pass
 
     assert text in generate_summary(text) 
-
 
 
 def test_schema_error():

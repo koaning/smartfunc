@@ -13,7 +13,7 @@ pypi:
 	uv publish
 
 check:
-	uv run pytest tests.py
+	uv run pytest tests
 
 clean:
 	rm -rf __pycache__ .pytest_cache dist
