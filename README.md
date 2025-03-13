@@ -178,7 +178,8 @@ This will return a dictionary with the debug information.
             'properties': {
                 'summary': {'title': 'Summary', 'type': 'string'}, 
                 'pros': {'items': {'type': 'string'}, 'title': 'Pros', 'type': 'array'}, 
-                'cons': {'items': {'type': 'string'}, 'title': 'Cons', 'type': 'array'}}, 
+                'cons': {'items': {'type': 'string'}, 'title': 'Cons', 'type': 'array'}
+            }, 
             'required': ['summary', 'pros', 'cons'], 
             'title': 'Summary', 
             'type': 'object'
