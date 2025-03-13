@@ -28,7 +28,7 @@ The `generate_summary` function will now return a string with the summary of the
 
 ## How does it work?
 
-This library wraps around the [llm library](https://llm.datasette.io/en/stable/index.html) made by Simon Willison. The docstring is parsed and turned into a Jinja2 template which we inject with variables to generate a prompt at runtime. We then use the backend given by the decorator to run the prompt and return the result.
+This library wraps around the [llm library](https://llm.datasette.io/en/stable/index.html) made by [Simon Willison](https://simonwillison.net/). The docstring is parsed and turned into a Jinja2 template which we inject with variables to generate a prompt at runtime. We then use the backend given by the decorator to run the prompt and return the result.
 
 The `llm` library is minimalistic and while it does not support all the features out there it does offer a solid foundation to build on. This library is mainly meant as a method to add some syntactic sugar on top. We do get a few nice benefits from the `llm` library though:
 
