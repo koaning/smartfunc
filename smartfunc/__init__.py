@@ -1,10 +1,10 @@
+import datetime 
 from functools import wraps
 import inspect
 from typing import Callable, get_type_hints, Any, Optional, Type
 import json
 from pydantic import BaseModel
 from jinja2 import Template
-from diskcache import Cache
 import llm
 
 
@@ -67,6 +67,19 @@ def _process_response(response_text: str, return_type: Optional[Type[BaseModel]]
         return json.loads(response_text)
     return response_text
 
+def _prepare_debug_info(backend, func: Callable, all_kwargs: dict, formatted_docstring: str, return_type: Optional[Type[BaseModel]] = None) -> dict:
+    if return_type:
+        return_type = return_type.model_json_schema()
+    return {
+        "template": func.__doc__,
+        "func_name": func.__name__,
+        "prompt": formatted_docstring,
+        "system": backend.system,
+        "template_inputs": all_kwargs,
+        "backend_kwargs": backend.kwargs,
+        "datetime": datetime.datetime.now().isoformat(),
+        "return_type": return_type,
+    }
 
 class backend:
     """Synchronous backend decorator for LLM-powered functions.
@@ -78,7 +91,6 @@ class backend:
     Features:
     - Template-based prompt generation from docstring
     - Optional response validation using Pydantic models
-    - Built-in caching support
     - Synchronous execution
     
     Example:
@@ -88,40 +100,38 @@ class backend:
             pass
     """
 
-    def __init__(self, name, system=None, cache=None, **kwargs):
+    def __init__(self, name, system=None, debug=False, **kwargs):
         """Initialize the backend with specific LLM configuration.
         
         Args:
             name: Name/identifier of the LLM model to use
             system: Optional system prompt for the LLM
-            cache: Optional cache configuration (string path or Cache instance)
+            debug: Adds extra information to the output that might help with debugging
             **kwargs: Additional arguments passed to the LLM
         """
         self.model = llm.get_model(name)
         self.system = system
         self.kwargs = kwargs
-        self.cache = Cache(cache) if isinstance(cache, str) else cache
+        self.debug = debug
 
     def __call__(self, func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs):
             formatted_docstring, all_kwargs, return_type = _prepare_function_call(func, args, kwargs)
-            
-            if self.cache:
-                cache_key = formatted_docstring + json.dumps(all_kwargs) + str(return_type)
-                if cache_key in self.cache:
-                    return self.cache[cache_key]
 
             resp = self.model.prompt(
                 formatted_docstring,
                 system=self.system,
                 schema=return_type,
-                **kwargs
+                **self.kwargs
             )
             out = _process_response(resp.text(), return_type)
 
-            if self.cache:
-                self.cache[cache_key] = out
+            if self.debug:
+                if isinstance(out, str):
+                    out = {"result": out}
+                out["_debug"] = _prepare_debug_info(self, func, all_kwargs, formatted_docstring, return_type)
+
             return out
 
         return wrapper
@@ -150,31 +160,40 @@ class async_backend:
             pass
     """
 
-    def __init__(self, name, system=None, **kwargs):
+    def __init__(self, name, system=None, debug=False, **kwargs):
         """Initialize the async backend with specific LLM configuration.
         
         Args:
             name: Name/identifier of the LLM model to use
             system: Optional system prompt for the LLM
+            debug: Adds extra information to the output that might help with debugging
             **kwargs: Additional arguments passed to the LLM
         """
         self.model = llm.get_async_model(name)
         self.system = system
         self.kwargs = kwargs
+        self.debug = debug
 
     def __call__(self, func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            formatted_docstring, _, return_type = _prepare_function_call(func, args, kwargs)
+            formatted_docstring, all_kwargs, return_type = _prepare_function_call(func, args, kwargs)
 
             resp = await self.model.prompt(
                 formatted_docstring,
                 system=self.system,
                 schema=return_type,
-                **kwargs
+                **self.kwargs
             )
             text = await resp.text()
-            return _process_response(text, return_type)
+            out = _process_response(text, return_type)
+        
+            if self.debug:
+                if isinstance(out, str):
+                    out = {"result": out}
+                out["_debug"] = _prepare_debug_info(self, func, all_kwargs, formatted_docstring, return_type)
+
+            return out
 
         return wrapper
 
