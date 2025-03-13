@@ -4,7 +4,6 @@ from typing import Callable, get_type_hints, Any, Optional, Type
 import json
 from pydantic import BaseModel
 from jinja2 import Template
-from diskcache import Cache
 import llm
 
 
@@ -78,7 +77,6 @@ class backend:
     Features:
     - Template-based prompt generation from docstring
     - Optional response validation using Pydantic models
-    - Built-in caching support
     - Synchronous execution
     
     Example:
@@ -88,29 +86,24 @@ class backend:
             pass
     """
 
-    def __init__(self, name, system=None, cache=None, **kwargs):
+    def __init__(self, name, system=None, debug=False, **kwargs):
         """Initialize the backend with specific LLM configuration.
         
         Args:
             name: Name/identifier of the LLM model to use
             system: Optional system prompt for the LLM
-            cache: Optional cache configuration (string path or Cache instance)
+            debug: Adds extra information to the output that might help with debugging
             **kwargs: Additional arguments passed to the LLM
         """
         self.model = llm.get_model(name)
         self.system = system
         self.kwargs = kwargs
-        self.cache = Cache(cache) if isinstance(cache, str) else cache
+        self.debug = debug
 
     def __call__(self, func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs):
             formatted_docstring, all_kwargs, return_type = _prepare_function_call(func, args, kwargs)
-            
-            if self.cache:
-                cache_key = formatted_docstring + json.dumps(all_kwargs) + str(return_type)
-                if cache_key in self.cache:
-                    return self.cache[cache_key]
 
             resp = self.model.prompt(
                 formatted_docstring,
@@ -120,8 +113,15 @@ class backend:
             )
             out = _process_response(resp.text(), return_type)
 
-            if self.cache:
-                self.cache[cache_key] = out
+            if self.debug:
+                if isinstance(out, str):
+                    out = {"result": out}
+                out["_debug"] = {
+                    "prompt": formatted_docstring,
+                    "system": self.system,
+                    "kwargs": all_kwargs,
+                }
+
             return out
 
         return wrapper
@@ -150,17 +150,19 @@ class async_backend:
             pass
     """
 
-    def __init__(self, name, system=None, **kwargs):
+    def __init__(self, name, system=None, debug=False, **kwargs):
         """Initialize the async backend with specific LLM configuration.
         
         Args:
             name: Name/identifier of the LLM model to use
             system: Optional system prompt for the LLM
+            debug: Adds extra information to the output that might help with debugging
             **kwargs: Additional arguments passed to the LLM
         """
         self.model = llm.get_async_model(name)
         self.system = system
         self.kwargs = kwargs
+        self.debug = debug
 
     def __call__(self, func: Callable) -> Callable:
         @wraps(func)
@@ -174,7 +176,16 @@ class async_backend:
                 **kwargs
             )
             text = await resp.text()
-            return _process_response(text, return_type)
+            out = _process_response(text, return_type)
+        
+            if self.debug:
+                out["_debug"] = {
+                    "prompt": formatted_docstring,
+                    "system": self.system,
+                    "kwargs": kwargs,
+                }
+
+            return out
 
         return wrapper
 
