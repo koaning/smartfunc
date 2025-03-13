@@ -124,3 +124,65 @@ async def generate_poke_desc(text: str) -> Summary:
 resp = asyncio.run(generate_poke_desc("pikachu"))
 print(resp)
 ```
+
+### Debug mode
+
+The library also supports debug mode. This is useful if you want to see the prompt that was used or if you want to see the response that was returned.
+
+```python
+import asyncio
+from smartfunc import async_backend
+from pydantic import BaseModel
+from dotenv import load_dotenv
+
+load_dotenv(".env")
+
+
+class Summary(BaseModel):
+    summary: str
+    pros: list[str]
+    cons: list[str]
+
+
+@async_backend("gpt-4o-mini", debug=True)
+async def generate_poke_desc(text: str) -> Summary:
+    """Describe the following pokemon: {{ text }}"""
+    pass
+
+resp = asyncio.run(generate_poke_desc("pikachu"))
+print(resp)
+```
+
+This will return a dictionary with the debug information.
+
+```python
+{
+    'summary': 'Pikachu is a small, yellow, rodent-like Pokémon known for its electric powers and iconic status as the franchise mascot. It has long ears with black tips, red cheeks that store electricity, and a lightning bolt-shaped tail. Pikachu evolves from Pichu when leveled up with high friendship and can further evolve into Raichu when exposed to a Thunder Stone. Pikachu is often depicted as cheerful, playfully energetic, and is renowned for its ability to generate electricity, which it can unleash in powerful attacks such as Thunderbolt and Volt Tackle.', 
+    'pros': [
+        'Iconic mascot of the Pokémon franchise', 'Popular among fans of all ages', 'Strong electric-type moves', 'Cute and friendly appearance'
+    ], 
+    'cons': [
+        'Limited range of evolution (only evolves into Raichu)', 'Commonly found, which may reduce uniqueness', 'Vulnerable to ground-type moves', 'Requires high friendship for evolution to Pichu, which can be a long process'
+    ], 
+    '_debug': {
+        'template': 'Describe the following pokemon: {{ text }}', 
+        'func_name': 'generate_poke_desc', 
+        'prompt': 'Describe the following pokemon: pikachu', 
+        'system': None, 
+        'template_inputs': {
+            'text': 'pikachu'
+        }, 
+        'backend_kwargs': {}, 
+        'datetime': '2025-03-13T16:05:44.754579', 
+        'return_type': {
+            'properties': {
+                'summary': {'title': 'Summary', 'type': 'string'}, 
+                'pros': {'items': {'type': 'string'}, 'title': 'Pros', 'type': 'array'}, 
+                'cons': {'items': {'type': 'string'}, 'title': 'Cons', 'type': 'array'}}, 
+            'required': ['summary', 'pros', 'cons'], 
+            'title': 'Summary', 
+            'type': 'object'
+        }
+    }
+}
+```
