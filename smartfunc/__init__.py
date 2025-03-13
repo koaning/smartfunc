@@ -1,3 +1,4 @@
+import datetime 
 from functools import wraps
 import inspect
 from typing import Callable, get_type_hints, Any, Optional, Type
@@ -66,6 +67,19 @@ def _process_response(response_text: str, return_type: Optional[Type[BaseModel]]
         return json.loads(response_text)
     return response_text
 
+def _prepare_debug_info(backend, func: Callable, all_kwargs: dict, formatted_docstring: str, return_type: Optional[Type[BaseModel]] = None) -> dict:
+    if return_type:
+        return_type = return_type.model_json_schema()
+    return {
+        "template": func.__doc__,
+        "func_name": func.__name__,
+        "prompt": formatted_docstring,
+        "system": backend.system,
+        "template_inputs": all_kwargs,
+        "backend_kwargs": backend.kwargs,
+        "datetime": datetime.datetime.now().isoformat(),
+        "return_type": return_type,
+    }
 
 class backend:
     """Synchronous backend decorator for LLM-powered functions.
@@ -109,18 +123,14 @@ class backend:
                 formatted_docstring,
                 system=self.system,
                 schema=return_type,
-                **kwargs
+                **self.kwargs
             )
             out = _process_response(resp.text(), return_type)
 
             if self.debug:
                 if isinstance(out, str):
                     out = {"result": out}
-                out["_debug"] = {
-                    "prompt": formatted_docstring,
-                    "system": self.system,
-                    "kwargs": all_kwargs,
-                }
+                out["_debug"] = _prepare_debug_info(self, func, all_kwargs, formatted_docstring, return_type)
 
             return out
 
@@ -167,23 +177,21 @@ class async_backend:
     def __call__(self, func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            formatted_docstring, _, return_type = _prepare_function_call(func, args, kwargs)
+            formatted_docstring, all_kwargs, return_type = _prepare_function_call(func, args, kwargs)
 
             resp = await self.model.prompt(
                 formatted_docstring,
                 system=self.system,
                 schema=return_type,
-                **kwargs
+                **self.kwargs
             )
             text = await resp.text()
             out = _process_response(text, return_type)
         
             if self.debug:
-                out["_debug"] = {
-                    "prompt": formatted_docstring,
-                    "system": self.system,
-                    "kwargs": kwargs,
-                }
+                if isinstance(out, str):
+                    out = {"result": out}
+                out["_debug"] = _prepare_debug_info(self, func, all_kwargs, formatted_docstring, return_type)
 
             return out
 
