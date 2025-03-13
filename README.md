@@ -90,7 +90,11 @@ This is the result that we got back:
 Not every backend supports schemas, but you will a helpful error message if that is the case.
 
 > [!NOTE]  
-> You might look at this example and wonder if you might be better off using [instructor](https://python.useinstructor.com/). After all, that library has more support for validation of parameters and even has some utilities for multi-turn conversations. All of this is true, but instructor requires you to learn a fair bit more about each individual backend. If you want to to use claude instead of openai then you will need to load in a different library. Here, you just need to make sure the `llm` plugin is installed and you're good to go.
+> You might look at this example and wonder if you might be better off using [instructor](https://python.useinstructor.com/). After all, that library has more support for validation of parameters and even has some utilities for multi-turn conversations. And what about [ell](https://github.com/MadcowD/ell) or [marvin](https://www.askmarvin.ai/)?! 
+> 
+> You will notice that `smartfunc` doesn't do a bunch of things those other libraries do. But the goal here is simplicity and a focus on a specific set of features.  For example; instructor requires you to learn a fair bit more about each individual backend. If you want to to use claude instead of openai then you will need to load in a different library. Similarily I felt that all the other platforms that similar things missing: async support or freedom for vendors. 
+>
+> The goal here is simplicity during rapid prototyping. You just need to make sure the `llm` plugin is installed and you're good to go. That's it. 
 
 
 ### Async
