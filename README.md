@@ -97,6 +97,35 @@ Not every backend supports schemas, but you will a helpful error message if that
 > The goal here is simplicity during rapid prototyping. You just need to make sure the `llm` plugin is installed and you're good to go. That's it. 
 
 
+### Inner function prompt engineering
+
+The simplest way to use `smartfunc` is to just put your prompt in the docstring and to be done with it. You can also run jinja2 in it if you want, but if you need the extra flexibility then you can also use the inner function to write the logic of your promopt. Any string that the inner function returns will be added at the back of the docstring prompt.
+
+```python
+import asyncio
+from smartfunc import async_backend
+from pydantic import BaseModel
+from dotenv import load_dotenv
+
+load_dotenv(".env")
+
+
+class Summary(BaseModel):
+    summary: str
+    pros: list[str]
+    cons: list[str]
+
+# This would also work, but has the benefit that you can use the inner function to write 
+# the logic of your prompt which allows for more flexible prompt engineering
+@async_backend("gpt-4o-mini")
+async def generate_poke_desc(text: str) -> Summary:
+    """Describe the following pokemon: """
+    return text
+
+resp = asyncio.run(generate_poke_desc("pikachu"))
+print(resp) # This response should now be more child-like
+```
+
 ### Async
 
 The library also supports async functions. This is useful if you want to do microbatching or if you want to use the async backends from the `llm` library.
