@@ -15,6 +15,18 @@ def test_basic(text):
     assert text in generate_summary(text) 
 
 
+@pytest.mark.parametrize("text", ["Hello, world!", "Hello, programmer!"])
+def test_basic_output(text):
+    """Ensure that we can also put the returned string in the output"""
+    @backend("markov")
+    def generate_summary(t):
+        """Generate a summary of the following text: {{ t }}"""
+        return "dinosaurhead"
+
+    assert "dinosaurhead" in generate_summary(text) 
+    assert text in generate_summary(text) 
+
+
 def test_schema_error():
     """The markov backend does not support schemas, error should be raised"""
     with pytest.raises(ValueError):
@@ -66,7 +78,7 @@ def test_debug_info_keys():
     @backend("markov", debug=True, system="You are a helpful assistant.")
     def generate_summary(text):
         """Generate a summary of the following text: {{ text }}"""
-        pass
+        return "dinosaurhead"
 
     result = generate_summary("Hello, world!")
     debug_info = result["_debug"]
@@ -90,7 +102,7 @@ def test_debug_info_keys():
     # Check specific values
     assert debug_info["template"] == "Generate a summary of the following text: {{ text }}"
     assert debug_info["func_name"] == "generate_summary"
-    assert debug_info["prompt"] == "Generate a summary of the following text: Hello, world!"
+    assert debug_info["prompt"] == "Generate a summary of the following text: Hello, world! dinosaurhead"
     assert debug_info["system"] == "You are a helpful assistant."
     assert debug_info["template_inputs"] == {"text": "Hello, world!"}
     assert debug_info["return_type"] is None 

@@ -1,5 +1,4 @@
 install: 
-	python -m pip install uv
 	uv venv
 	uv pip install -e .
 	uv pip install pytest pytest-asyncio llm-markov
@@ -13,3 +12,6 @@ check:
 
 clean:
 	rm -rf __pycache__ .pytest_cache dist
+
+play: install
+	uv run --with marimo marimo edit app.py

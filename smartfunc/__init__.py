@@ -46,6 +46,9 @@ def _prepare_function_call(func: Callable, args: tuple, kwargs: dict) -> tuple[s
     template = Template(docstring)
     formatted_docstring = template.render(**all_kwargs)
 
+    func_output = func(*args, **kwargs)
+    if isinstance(func_output, str):
+        formatted_docstring += f" {func_output}"
     return formatted_docstring, all_kwargs, type_hints.get('return', None)
 
 
