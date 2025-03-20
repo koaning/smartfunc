@@ -103,7 +103,7 @@ The simplest way to use `smartfunc` is to just put your prompt in the docstring 
 
 ```python
 import asyncio
-from smartfunc import async_backend
+from smartfunc import backend
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
@@ -117,12 +117,12 @@ class Summary(BaseModel):
 
 # This would also work, but has the benefit that you can use the inner function to write 
 # the logic of your prompt which allows for more flexible prompt engineering
-@async_backend("gpt-4o-mini")
+@backend("gpt-4o-mini")
 async def generate_poke_desc(text: str) -> Summary:
-    """Describe the following pokemon: """
-    return text
+    """Describe the following pokemon: {{ text }}"""
+    return " ... but make it sound as if you are a 10 year old child"
 
-resp = asyncio.run(generate_poke_desc("pikachu"))
+resp = generate_poke_desc("pikachu")
 print(resp) # This response should now be more child-like
 ```
 
