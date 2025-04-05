@@ -118,7 +118,7 @@ class Summary(BaseModel):
 # This would also work, but has the benefit that you can use the inner function to write 
 # the logic of your prompt which allows for more flexible prompt engineering
 @backend("gpt-4o-mini")
-async def generate_poke_desc(text: str) -> Summary:
+def generate_poke_desc(text: str) -> Summary:
     """Describe the following pokemon: {{ text }}"""
     return " ... but make it sound as if you are a 10 year old child"
 
