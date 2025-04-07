@@ -67,7 +67,7 @@ def _process_response(response_text: str, return_type: Optional[Type[BaseModel]]
         - If return_type is None: Raw response text
     """
     if return_type:
-        return json.loads(response_text)
+        return return_type(**json.loads(response_text))
     return response_text
 
 def _prepare_debug_info(backend, func: Callable, all_kwargs: dict, formatted_docstring: str, return_type: Optional[Type[BaseModel]] = None) -> dict:
