@@ -4,6 +4,11 @@
 
 > Turn docstrings into LLM-functions
 
+If you're keen for a demo, you may appreciate this YouTube video: 
+
+[![image](https://github.com/user-attachments/assets/8dee073b-e922-43d7-9ce8-def72a868844)
+](https://youtu.be/j9jh46R0ryY)
+
 ## Installation
 
 ```bash
