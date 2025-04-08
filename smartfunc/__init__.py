@@ -63,7 +63,7 @@ def _process_response(response_text: str, return_type: Optional[Type[BaseModel]]
         return_type: Expected return type (Pydantic model) or None
         
     Returns:
-        - If return_type is specified: JSON-parsed response converted to the Pydantic model
+        - If return_type is specified: JSON-parsed response
         - If return_type is None: Raw response text
     """
     if return_type:
