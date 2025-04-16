@@ -4,7 +4,7 @@
 
 > Turn docstrings into LLM-functions
 
-If you're keen for a demo, you may appreciate this YouTube video: 
+If you're keen for a demo, you may appreciate this YouTube video:
 
 [![image](https://github.com/user-attachments/assets/8dee073b-e922-43d7-9ce8-def72a868844)
 ](https://youtu.be/j9jh46R0ryY)
@@ -26,7 +26,6 @@ from smartfunc import backend
 @backend("gpt-4")
 def generate_summary(text: str):
     """Generate a summary of the following text: {{ text }}"""
-    pass
 ```
 
 The `generate_summary` function will now return a string with the summary of the text that you give it.
@@ -66,7 +65,6 @@ llmify = backend("gpt-4o-mini", system="You are a helpful assistant.", temperatu
 @llmify
 def generate_poke_desc(text: str) -> Summary:
     """Describe the following pokemon: {{ text }}"""
-    pass
 
 print(generate_poke_desc("pikachu"))
 ```
@@ -75,18 +73,18 @@ This is the result that we got back:
 
 ```python
 {
-    'summary': 'Pikachu is a small, electric-type Pokémon known for its adorable appearance and strong electrical abilities. It is recognized as the mascot of the Pokémon franchise, with distinctive features and a cheerful personality.', 
+    'summary': 'Pikachu is a small, electric-type Pokémon known for its adorable appearance and strong electrical abilities. It is recognized as the mascot of the Pokémon franchise, with distinctive features and a cheerful personality.',
     'pros': [
-        'Iconic and recognizable worldwide', 
-        'Strong electric attacks like Thunderbolt', 
-        'Has a cute and friendly appearance', 
-        'Evolves into Raichu with a Thunder Stone', 
+        'Iconic and recognizable worldwide',
+        'Strong electric attacks like Thunderbolt',
+        'Has a cute and friendly appearance',
+        'Evolves into Raichu with a Thunder Stone',
         'Popular choice in Pokémon merchandise and media'
-    ], 
+    ],
     'cons': [
-        'Not very strong in higher-level battles', 
-        'Weak against ground-type moves', 
-        'Limited to electric-type attacks unless learned through TMs', 
+        'Not very strong in higher-level battles',
+        'Weak against ground-type moves',
+        'Limited to electric-type attacks unless learned through TMs',
         'Can be overshadowed by other powerful Pokémon in competitive play'
     ],
 }
@@ -95,11 +93,11 @@ This is the result that we got back:
 Not every backend supports schemas, but you will a helpful error message if that is the case.
 
 > [!NOTE]  
-> You might look at this example and wonder if you might be better off using [instructor](https://python.useinstructor.com/). After all, that library has more support for validation of parameters and even has some utilities for multi-turn conversations. And what about [ell](https://github.com/MadcowD/ell) or [marvin](https://www.askmarvin.ai/)?! 
-> 
-> You will notice that `smartfunc` doesn't do a bunch of things those other libraries do. But the goal here is simplicity and a focus on a specific set of features.  For example; instructor requires you to learn a fair bit more about each individual backend. If you want to to use claude instead of openai then you will need to load in a different library. Similarily I felt that all the other platforms that similar things missing: async support or freedom for vendors. 
+> You might look at this example and wonder if you might be better off using [instructor](https://python.useinstructor.com/). After all, that library has more support for validation of parameters and even has some utilities for multi-turn conversations. And what about [ell](https://github.com/MadcowD/ell) or [marvin](https://www.askmarvin.ai/)?!
 >
-> The goal here is simplicity during rapid prototyping. You just need to make sure the `llm` plugin is installed and you're good to go. That's it. 
+> You will notice that `smartfunc` doesn't do a bunch of things those other libraries do. But the goal here is simplicity and a focus on a specific set of features.  For example; instructor requires you to learn a fair bit more about each individual backend. If you want to to use claude instead of openai then you will need to load in a different library. Similarily I felt that all the other platforms that similar things missing: async support or freedom for vendors.
+>
+> The goal here is simplicity during rapid prototyping. You just need to make sure the `llm` plugin is installed and you're good to go. That's it.
 
 
 ### Inner function prompt engineering
@@ -120,7 +118,7 @@ class Summary(BaseModel):
     pros: list[str]
     cons: list[str]
 
-# This would also work, but has the benefit that you can use the inner function to write 
+# This would also work, but has the benefit that you can use the inner function to write
 # the logic of your prompt which allows for more flexible prompt engineering
 @backend("gpt-4o-mini")
 def generate_poke_desc(text: str) -> Summary:
@@ -153,7 +151,6 @@ class Summary(BaseModel):
 @async_backend("gpt-4o-mini")
 async def generate_poke_desc(text: str) -> Summary:
     """Describe the following pokemon: {{ text }}"""
-    pass
 
 resp = asyncio.run(generate_poke_desc("pikachu"))
 print(resp)
@@ -181,7 +178,6 @@ class Summary(BaseModel):
 @async_backend("gpt-4o-mini", debug=True)
 async def generate_poke_desc(text: str) -> Summary:
     """Describe the following pokemon: {{ text }}"""
-    pass
 
 resp = asyncio.run(generate_poke_desc("pikachu"))
 print(resp)
@@ -191,31 +187,31 @@ This will return a dictionary with the debug information.
 
 ```python
 {
-    'summary': 'Pikachu is a small, yellow, rodent-like Pokémon known for its electric powers and iconic status as the franchise mascot. It has long ears with black tips, red cheeks that store electricity, and a lightning bolt-shaped tail. Pikachu evolves from Pichu when leveled up with high friendship and can further evolve into Raichu when exposed to a Thunder Stone. Pikachu is often depicted as cheerful, playfully energetic, and is renowned for its ability to generate electricity, which it can unleash in powerful attacks such as Thunderbolt and Volt Tackle.', 
+    'summary': 'Pikachu is a small, yellow, rodent-like Pokémon known for its electric powers and iconic status as the franchise mascot. It has long ears with black tips, red cheeks that store electricity, and a lightning bolt-shaped tail. Pikachu evolves from Pichu when leveled up with high friendship and can further evolve into Raichu when exposed to a Thunder Stone. Pikachu is often depicted as cheerful, playfully energetic, and is renowned for its ability to generate electricity, which it can unleash in powerful attacks such as Thunderbolt and Volt Tackle.',
     'pros': [
         'Iconic mascot of the Pokémon franchise', 'Popular among fans of all ages', 'Strong electric-type moves', 'Cute and friendly appearance'
-    ], 
+    ],
     'cons': [
         'Limited range of evolution (only evolves into Raichu)', 'Commonly found, which may reduce uniqueness', 'Vulnerable to ground-type moves', 'Requires high friendship for evolution to Pichu, which can be a long process'
-    ], 
+    ],
     '_debug': {
-        'template': 'Describe the following pokemon: {{ text }}', 
-        'func_name': 'generate_poke_desc', 
-        'prompt': 'Describe the following pokemon: pikachu', 
-        'system': None, 
+        'template': 'Describe the following pokemon: {{ text }}',
+        'func_name': 'generate_poke_desc',
+        'prompt': 'Describe the following pokemon: pikachu',
+        'system': None,
         'template_inputs': {
             'text': 'pikachu'
-        }, 
-        'backend_kwargs': {}, 
-        'datetime': '2025-03-13T16:05:44.754579', 
+        },
+        'backend_kwargs': {},
+        'datetime': '2025-03-13T16:05:44.754579',
         'return_type': {
             'properties': {
-                'summary': {'title': 'Summary', 'type': 'string'}, 
-                'pros': {'items': {'type': 'string'}, 'title': 'Pros', 'type': 'array'}, 
+                'summary': {'title': 'Summary', 'type': 'string'},
+                'pros': {'items': {'type': 'string'}, 'title': 'Pros', 'type': 'array'},
                 'cons': {'items': {'type': 'string'}, 'title': 'Cons', 'type': 'array'}
-            }, 
-            'required': ['summary', 'pros', 'cons'], 
-            'title': 'Summary', 
+            },
+            'required': ['summary', 'pros', 'cons'],
+            'title': 'Summary',
             'type': 'object'
         }
     }
