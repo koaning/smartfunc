@@ -1,214 +1,237 @@
-import datetime 
 from functools import wraps
-import inspect
-from typing import Callable, get_type_hints, Any, Optional, Type
-import json
+from typing import Callable, Optional, Type, Union
 from pydantic import BaseModel
-from jinja2 import Template
-import llm
+from openai import OpenAI, AsyncOpenAI
 
-
-def _prepare_function_call(func: Callable, args: tuple, kwargs: dict) -> tuple[str, dict, Optional[Type[BaseModel]]]:
-    """Prepares a function call for LLM processing by extracting and validating necessary information.
-    
-    This internal helper function handles:
-    1. Extracting and validating the function's return type (must be Pydantic model if specified)
-    2. Processing function arguments and applying defaults
-    3. Rendering the function's docstring as a template using the provided arguments
-    
-    Args:
-        func: The function to be processed
-        args: Positional arguments passed to the function
-        kwargs: Keyword arguments passed to the function
-        
-    Returns:
-        A tuple containing:
-        - formatted_docstring: The rendered docstring with arguments applied
-        - all_kwargs: Dictionary of all arguments (both positional and keyword)
-        - return_type: The expected return type (Pydantic model) or None
-        
-    Raises:
-        AssertionError: If return type is specified but is not a Pydantic BaseModel
-    """
-    signature = inspect.signature(func)
-    docstring = inspect.getdoc(func) or ""
-    type_hints = get_type_hints(func)
-
-    # We only support Pydantic now
-    if type_hints.get('return', None):
-        assert issubclass(type_hints.get('return', None), BaseModel), "Output type must be Pydantic class"
-
-    # Create a dictionary of parameter types
-    bound_args = signature.bind(*args, **kwargs)
-    bound_args.apply_defaults()  # Apply default values for missing parameters
-    all_kwargs = bound_args.arguments
-
-    template = Template(docstring)
-    formatted_docstring = template.render(**all_kwargs)
-
-    func_output = func(*args, **kwargs)
-    if isinstance(func_output, str):
-        formatted_docstring += f" {func_output}"
-    return formatted_docstring, all_kwargs, type_hints.get('return', None)
-
-
-def _process_response(response_text: str, return_type: Optional[Type[BaseModel]]) -> Any:
-    """Processes the LLM response text based on the expected return type.
-    
-    This internal helper function handles the conversion of raw LLM response text
-    to the appropriate return type.
-    
-    Args:
-        response_text: Raw text response from the LLM
-        return_type: Expected return type (Pydantic model) or None
-        
-    Returns:
-        - If return_type is specified: JSON-parsed response
-        - If return_type is None: Raw response text
-    """
-    if return_type:
-        return json.loads(response_text)
-    return response_text
-
-def _prepare_debug_info(backend, func: Callable, all_kwargs: dict, formatted_docstring: str, return_type: Optional[Type[BaseModel]] = None) -> dict:
-    if return_type:
-        return_type = return_type.model_json_schema()
-    return {
-        "template": func.__doc__,
-        "func_name": func.__name__,
-        "prompt": formatted_docstring,
-        "system": backend.system,
-        "template_inputs": all_kwargs,
-        "backend_kwargs": backend.kwargs,
-        "datetime": datetime.datetime.now().isoformat(),
-        "return_type": return_type,
-    }
 
 class backend:
     """Synchronous backend decorator for LLM-powered functions.
-    
+
     This class provides a decorator that transforms a function into an LLM-powered
-    endpoint. The function's docstring is used as the prompt template, and its
-    return type annotation (if specified) determines the expected response format.
-    
+    endpoint. The function should return a string that will be used as the prompt,
+    and the decorator handles calling the LLM and parsing the response.
+
     Features:
-    - Template-based prompt generation from docstring
-    - Optional response validation using Pydantic models
-    - Synchronous execution
-    
+    - Works with any OpenAI SDK-compatible provider (OpenAI, OpenRouter, etc.)
+    - Optional structured output validation using Pydantic models
+    - Full control over prompt generation using Python
+
     Example:
-        @backend("gpt-4")
-        def generate_summary(text: str) -> SummaryModel:
-            '''Generate a summary of the following text: {{ text }}'''
-            pass
+        from openai import OpenAI
+        from pydantic import BaseModel
+
+        client = OpenAI()
+
+        class Summary(BaseModel):
+            summary: str
+            pros: list[str]
+
+        @backend(client, model="gpt-4o-mini", response_format=Summary)
+        def generate_summary(text: str) -> Summary:
+            '''Generate a summary of the following text.'''
+            return f"Summarize this text: {text}"
+
+        result = generate_summary("Some text here")
+        print(result.summary)
     """
 
-    def __init__(self, name, system=None, debug=False, **kwargs):
+    def __init__(
+        self,
+        client: OpenAI,
+        model: str,
+        response_format: Optional[Type[BaseModel]] = None,
+        system: Optional[str] = None,
+        **kwargs
+    ):
         """Initialize the backend with specific LLM configuration.
-        
+
         Args:
-            name: Name/identifier of the LLM model to use
+            client: OpenAI client instance (or compatible client)
+            model: Name/identifier of the model to use (e.g., "gpt-4o-mini")
+            response_format: Optional Pydantic model for structured output
             system: Optional system prompt for the LLM
-            debug: Adds extra information to the output that might help with debugging
-            **kwargs: Additional arguments passed to the LLM
+            **kwargs: Additional arguments passed to the OpenAI API (e.g., temperature, max_tokens)
         """
-        self.model = llm.get_model(name)
+        self.client = client
+        self.model = model
+        self.response_format = response_format
         self.system = system
         self.kwargs = kwargs
-        self.debug = debug
 
     def __call__(self, func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs):
-            formatted_docstring, all_kwargs, return_type = _prepare_function_call(func, args, kwargs)
+            # Call the function to get the prompt
+            prompt = func(*args, **kwargs)
 
-            resp = self.model.prompt(
-                formatted_docstring,
-                system=self.system,
-                schema=return_type,
+            if not isinstance(prompt, str):
+                raise ValueError(
+                    f"Function {func.__name__} must return a string prompt, "
+                    f"got {type(prompt).__name__}"
+                )
+
+            # Build messages array
+            messages = []
+            if self.system:
+                messages.append({"role": "system", "content": self.system})
+            messages.append({"role": "user", "content": prompt})
+
+            # Prepare API call kwargs
+            call_kwargs = {
+                "model": self.model,
+                "messages": messages,
                 **self.kwargs
-            )
-            out = _process_response(resp.text(), return_type)
+            }
 
-            if self.debug:
-                if isinstance(out, str):
-                    out = {"result": out}
-                out["_debug"] = _prepare_debug_info(self, func, all_kwargs, formatted_docstring, return_type)
+            # Add structured output if specified
+            if self.response_format:
+                call_kwargs["response_format"] = {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": self.response_format.__name__,
+                        "schema": self.response_format.model_json_schema(),
+                        "strict": True
+                    }
+                }
 
-            return out
+            # Call OpenAI API
+            response = self.client.chat.completions.create(**call_kwargs)
+            response_text = response.choices[0].message.content
+
+            # Parse response
+            if self.response_format:
+                return self.response_format.model_validate_json(response_text)
+            else:
+                return response_text
 
         return wrapper
 
-    def run(self, func, *args, **kwargs):
-        new_func = self(func)
-        return new_func(*args, **kwargs)
+    def run(self, func: Callable, *args, **kwargs):
+        """Run a function through the backend without using it as a decorator.
+
+        Args:
+            func: The function to execute
+            *args: Positional arguments to pass to the function
+            **kwargs: Keyword arguments to pass to the function
+
+        Returns:
+            The result from the LLM (parsed according to response_format)
+        """
+        decorated_func = self(func)
+        return decorated_func(*args, **kwargs)
 
 
 class async_backend:
     """Asynchronous backend decorator for LLM-powered functions.
-    
+
     Similar to the synchronous `backend` class, but provides asynchronous execution.
     Use this when you need non-blocking LLM operations, typically in async web
-    applications or other async contexts.
-    
+    applications or for concurrent processing.
+
     Features:
-    - Async/await support
-    - Template-based prompt generation from docstring
-    - Optional response validation using Pydantic models
-    
+    - Async/await support for non-blocking operations
+    - Works with any OpenAI SDK-compatible provider
+    - Optional structured output validation using Pydantic models
+
     Example:
-        @async_backend("gpt-4")
-        async def generate_summary(text: str) -> SummaryModel:
-            '''Generate a summary of the following text: {{ text }}'''
-            pass
+        from openai import AsyncOpenAI
+        from pydantic import BaseModel
+        import asyncio
+
+        client = AsyncOpenAI()
+
+        class Summary(BaseModel):
+            summary: str
+
+        @async_backend(client, model="gpt-4o-mini", response_format=Summary)
+        async def generate_summary(text: str) -> Summary:
+            '''Generate a summary.'''
+            return f"Summarize: {text}"
+
+        result = asyncio.run(generate_summary("text"))
     """
 
-    def __init__(self, name, system=None, debug=False, **kwargs):
+    def __init__(
+        self,
+        client: AsyncOpenAI,
+        model: str,
+        response_format: Optional[Type[BaseModel]] = None,
+        system: Optional[str] = None,
+        **kwargs
+    ):
         """Initialize the async backend with specific LLM configuration.
-        
+
         Args:
-            name: Name/identifier of the LLM model to use
+            client: AsyncOpenAI client instance (or compatible async client)
+            model: Name/identifier of the model to use
+            response_format: Optional Pydantic model for structured output
             system: Optional system prompt for the LLM
-            debug: Adds extra information to the output that might help with debugging
-            **kwargs: Additional arguments passed to the LLM
+            **kwargs: Additional arguments passed to the OpenAI API
         """
-        self.model = llm.get_async_model(name)
+        self.client = client
+        self.model = model
+        self.response_format = response_format
         self.system = system
         self.kwargs = kwargs
-        self.debug = debug
 
     def __call__(self, func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            formatted_docstring, all_kwargs, return_type = _prepare_function_call(func, args, kwargs)
+            # Call the function to get the prompt
+            prompt = func(*args, **kwargs)
 
-            resp = await self.model.prompt(
-                formatted_docstring,
-                system=self.system,
-                schema=return_type,
+            if not isinstance(prompt, str):
+                raise ValueError(
+                    f"Function {func.__name__} must return a string prompt, "
+                    f"got {type(prompt).__name__}"
+                )
+
+            # Build messages array
+            messages = []
+            if self.system:
+                messages.append({"role": "system", "content": self.system})
+            messages.append({"role": "user", "content": prompt})
+
+            # Prepare API call kwargs
+            call_kwargs = {
+                "model": self.model,
+                "messages": messages,
                 **self.kwargs
-            )
-            text = await resp.text()
-            out = _process_response(text, return_type)
-        
-            if self.debug:
-                if isinstance(out, str):
-                    out = {"result": out}
-                out["_debug"] = _prepare_debug_info(self, func, all_kwargs, formatted_docstring, return_type)
+            }
 
-            return out
+            # Add structured output if specified
+            if self.response_format:
+                call_kwargs["response_format"] = {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": self.response_format.__name__,
+                        "schema": self.response_format.model_json_schema(),
+                        "strict": True
+                    }
+                }
+
+            # Call OpenAI API
+            response = await self.client.chat.completions.create(**call_kwargs)
+            response_text = response.choices[0].message.content
+
+            # Parse response
+            if self.response_format:
+                return self.response_format.model_validate_json(response_text)
+            else:
+                return response_text
 
         return wrapper
 
-    async def run(self, func, *args, **kwargs):
-        new_func = self(func)
-        return new_func(*args, **kwargs)
-    
+    async def run(self, func: Callable, *args, **kwargs):
+        """Run a function through the backend without using it as a decorator.
 
-def get_backend_models():
-    for model in llm.get_models():
-        print(model.model_id)
+        Args:
+            func: The function to execute
+            *args: Positional arguments to pass to the function
+            **kwargs: Keyword arguments to pass to the function
 
-def get_async_backend_models():
-    for model in llm.get_async_models():
-        print(model.model_id)
+        Returns:
+            The result from the LLM (parsed according to response_format)
+        """
+        decorated_func = self(func)
+        return await decorated_func(*args, **kwargs)

@@ -1,13 +1,11 @@
 [project]
 name = "smartfunc"
-version = "0.2.0"
-description = "A Python project"
+version = "0.3.0"
+description = "Turn functions into LLM-powered endpoints using OpenAI SDK"
 authors = []
 dependencies = [
     "pydantic>=2.0.0",
-    "jinja2>=3.0.0",
-    "diskcache>=5.0.0",
-    "llm"
+    "openai>=1.0.0",
 ]
 
 [build-system]
@@ -22,5 +20,6 @@ python_functions = ["test_*"]
 [project.optional-dependencies]
 test = [
     "pytest>=7.0.0",
-    "pytest-asyncio>=0.21.0",  # For async tests
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.12.0",
 ]
