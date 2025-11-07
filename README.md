@@ -40,7 +40,7 @@ The `generate_summary` function will now return a string with the summary of the
 
 ## How does it work?
 
-This library uses the OpenAI SDK to interact with LLMs. Your function returns a string that becomes the prompt, and the decorator handles calling the LLM and parsing the response.
+This library uses the OpenAI SDK to interact with LLMs. Your function can return either a string (which becomes the prompt) or a list of message dictionaries (for full conversation control). The decorator handles calling the LLM and parsing the response.
 
 The key benefits of this approach:
 
@@ -48,6 +48,8 @@ The key benefits of this approach:
 - **Full Python control**: Build prompts using Python (no template syntax to learn)
 - **Type-safe structured outputs**: Use Pydantic models for validated responses
 - **Async support**: Built-in async/await support for concurrent operations
+- **Conversation history**: Pass message lists for multi-turn conversations
+- **Multimodal support**: Include images, audio, and video via base64 encoding
 - **Simple and focused**: Does one thing well - turn functions into LLM calls
 
 ## Features
@@ -164,6 +166,129 @@ result = custom_prompt(
     style="formal",
     include_summary=True
 )
+```
+
+### Conversation History
+
+Instead of returning a string, you can return a list of message dictionaries to have full control over the conversation:
+
+```python
+@backend(client, model="gpt-4o-mini")
+def chat_with_history(user_message: str, conversation_history: list) -> list:
+    """Chat with conversation context."""
+    messages = [
+        {"role": "system", "content": "You are a helpful assistant."},
+    ]
+
+    # Add previous conversation
+    messages.extend(conversation_history)
+
+    # Add new user message
+    messages.append({"role": "user", "content": user_message})
+
+    return messages
+
+# Use it with conversation history
+history = [
+    {"role": "user", "content": "What's your name?"},
+    {"role": "assistant", "content": "I'm Claude, an AI assistant."},
+]
+
+response = chat_with_history("What can you help me with?", history)
+print(response)
+```
+
+Note: When you return a message list, the `system` parameter in the decorator is ignored.
+
+### Multimodal Content (Images, Audio, Video)
+
+You can include images, audio, or video by passing them as base64-encoded content in your messages:
+
+```python
+import base64
+
+@backend(client, model="gpt-4o-mini")
+def analyze_image(image_path: str, question: str) -> list:
+    """Analyze an image with a question."""
+    # Read and encode image
+    with open(image_path, "rb") as f:
+        image_data = base64.b64encode(f.read()).decode("utf-8")
+
+    return [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": question},
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{image_data}"
+                    },
+                },
+            ],
+        }
+    ]
+
+result = analyze_image("photo.jpg", "What's in this image?")
+print(result)
+```
+
+You can also mix multiple media types:
+
+```python
+@backend(client, model="gpt-4o-mini")
+def analyze_multiple_media(image1_path: str, image2_path: str) -> list:
+    """Compare two images."""
+    # Encode images
+    with open(image1_path, "rb") as f:
+        img1 = base64.b64encode(f.read()).decode("utf-8")
+    with open(image2_path, "rb") as f:
+        img2 = base64.b64encode(f.read()).decode("utf-8")
+
+    return [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "Compare these images:"},
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{img1}"},
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{img2}"},
+                },
+            ],
+        }
+    ]
+
+result = analyze_multiple_media("image1.jpg", "image2.jpg")
+```
+
+For audio content:
+
+```python
+@backend(client, model="gpt-4o-mini")
+def transcribe_audio(audio_path: str) -> list:
+    """Transcribe audio content."""
+    with open(audio_path, "rb") as f:
+        audio_data = base64.b64encode(f.read()).decode("utf-8")
+
+    return [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "Transcribe this audio:"},
+                {
+                    "type": "input_audio",
+                    "input_audio": {
+                        "data": audio_data,
+                        "format": "wav"  # or "mp3", "flac", etc.
+                    },
+                },
+            ],
+        }
+    ]
 ```
 
 ### Using OpenRouter
