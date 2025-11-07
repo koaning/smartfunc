@@ -86,7 +86,7 @@ class Summary(BaseModel):
     cons: list[str]
 
 @backend(client, model="gpt-4o-mini", response_format=Summary)
-def analyze_pokemon(name: str) -> Summary:
+def analyze_pokemon(name: str) -> str:
     return f"Describe the following pokemon: {name}"
 
 result = analyze_pokemon("pikachu")

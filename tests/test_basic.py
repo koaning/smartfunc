@@ -47,6 +47,8 @@ def test_structured_output(mock_client_factory):
     # Verify response_format was set
     assert "response_format" in client.calls[0]
     assert client.calls[0]["response_format"]["type"] == "json_schema"
+    schema = client.calls[0]["response_format"]["json_schema"]["schema"]
+    assert schema["additionalProperties"] is False
 
 
 def test_system_prompt(mock_client_factory):
@@ -137,6 +139,8 @@ async def test_async_structured_output(async_mock_client_factory):
     assert isinstance(result, Summary)
     assert result.summary == "async test"
     assert result.pros == ["fast"]
+    schema = client.calls[0]["response_format"]["json_schema"]["schema"]
+    assert schema["additionalProperties"] is False
 
 
 @pytest.mark.asyncio

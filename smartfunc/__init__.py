@@ -1,7 +1,46 @@
 from functools import wraps
-from typing import Callable, Optional, Type, Union
+from typing import Any, Callable, Optional, Type, Union
 from pydantic import BaseModel
 from openai import OpenAI, AsyncOpenAI
+
+
+def _disallow_additional_properties(schema: Any) -> Any:
+    """Ensure every object schema explicitly forbids unknown properties (OpenAI requirement)."""
+    if isinstance(schema, dict):
+        if schema.get("type") == "object":
+            schema["additionalProperties"] = False
+            props = schema.get("properties")
+            if isinstance(props, dict):
+                for value in props.values():
+                    _disallow_additional_properties(value)
+
+        items = schema.get("items")
+        if isinstance(items, dict) or isinstance(items, list):
+            _disallow_additional_properties(items)
+
+        for keyword in ("allOf", "anyOf", "oneOf"):
+            subschema = schema.get(keyword)
+            if isinstance(subschema, list):
+                for item in subschema:
+                    _disallow_additional_properties(item)
+            elif isinstance(subschema, dict):
+                _disallow_additional_properties(subschema)
+
+        not_schema = schema.get("not")
+        if isinstance(not_schema, dict):
+            _disallow_additional_properties(not_schema)
+
+        for defs_key in ("definitions", "$defs"):
+            defs = schema.get(defs_key)
+            if isinstance(defs, dict):
+                for value in defs.values():
+                    _disallow_additional_properties(value)
+
+    elif isinstance(schema, list):
+        for item in schema:
+            _disallow_additional_properties(item)
+
+    return schema
 
 
 class backend:
@@ -85,11 +124,14 @@ class backend:
 
             # Add structured output if specified
             if self.response_format:
+                schema = _disallow_additional_properties(
+                    self.response_format.model_json_schema()
+                )
                 call_kwargs["response_format"] = {
                     "type": "json_schema",
                     "json_schema": {
                         "name": self.response_format.__name__,
-                        "schema": self.response_format.model_json_schema(),
+                        "schema": schema,
                         "strict": True
                     }
                 }
@@ -201,11 +243,14 @@ class async_backend:
 
             # Add structured output if specified
             if self.response_format:
+                schema = _disallow_additional_properties(
+                    self.response_format.model_json_schema()
+                )
                 call_kwargs["response_format"] = {
                     "type": "json_schema",
                     "json_schema": {
                         "name": self.response_format.__name__,
-                        "schema": self.response_format.model_json_schema(),
+                        "schema": schema,
                         "strict": True
                     }
                 }
