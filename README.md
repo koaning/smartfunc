@@ -249,7 +249,7 @@ def summarize(text: str) -> Summary:
     pass
 ```
 
-### After (v0.3.0)
+### After (v1.0.0)
 
 ```python
 from smartfunc import backend
