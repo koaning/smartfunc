@@ -10,12 +10,6 @@
 uv pip install smartfunc
 ```
 
-You'll also need to set up your OpenAI API key:
-
-```bash
-export OPENAI_API_KEY=sk-...
-```
-
 ## What is this?
 
 Here is a nice example of what is possible with this library:
@@ -32,6 +26,8 @@ def generate_summary(text: str) -> str:
 ```
 
 The `generate_summary` function will now return a string with the summary of the text that you give it.
+
+> Note that we're using the OpenAI SDK here but that doesn't mean that you have to use their service. The OpenAI SDK also let's you connect to services like [Ollama](https://ollama.com/) locally or to many cloud hosting providers like [OpenRouter](https://openrouter.ai/). Just make sure you set the `api_key` and the `url` parameters manually when you call `OpenAI()`. 
 
 ## How does it work?
 
