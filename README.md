@@ -27,7 +27,17 @@ def generate_summary(text: str) -> str:
 
 The `generate_summary` function will now return a string with the summary of the text that you give it.
 
-> Note that we're using the OpenAI SDK here but that doesn't mean that you have to use their service. The OpenAI SDK also let's you connect to services like [Ollama](https://ollama.com/) locally or to many cloud hosting providers like [OpenRouter](https://openrouter.ai/). Just make sure you set the `api_key` and the `url` parameters manually when you call `OpenAI()`. 
+### Other providers 
+
+Note that we're using the OpenAI SDK here but that doesn't mean that you have to use their LLM service. The OpenAI SDK is a standard these days that has support for *many* (if not *most*) providers these days. These include services like [Ollama](https://ollama.com/) for local models or to many cloud hosting providers like [OpenRouter](https://openrouter.ai/). Just make sure you set the `api_key` and the `base_url` parameters manually when you call `OpenAI()`.
+
+```python
+OpenAI(
+    api_key=os.getenv("OPENROUTER_API_KEY"),
+    base_url="https://openrouter.ai/api/v1"
+)
+```
+
 
 ## How does it work?
 
