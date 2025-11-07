@@ -33,7 +33,6 @@ client = OpenAI()
 
 @backend(client, model="gpt-4o-mini")
 def generate_summary(text: str) -> str:
-    """Generate a summary."""
     return f"Generate a summary of the following text: {text}"
 ```
 
@@ -65,7 +64,6 @@ client = OpenAI()
 
 @backend(client, model="gpt-4o-mini")
 def write_poem(topic: str) -> str:
-    """Write a poem."""
     return f"Write a short poem about {topic}"
 
 print(write_poem("summer"))
@@ -89,7 +87,6 @@ class Summary(BaseModel):
 
 @backend(client, model="gpt-4o-mini", response_format=Summary)
 def analyze_pokemon(name: str) -> Summary:
-    """Analyze a Pokemon."""
     return f"Describe the following pokemon: {name}"
 
 result = analyze_pokemon("pikachu")
@@ -194,16 +191,6 @@ openrouter_client = OpenAI(
     api_key=os.getenv("OPENROUTER_API_KEY"),
     base_url="https://openrouter.ai/api/v1"
 )
-
-# Use Claude via OpenRouter
-@backend(openrouter_client, model="anthropic/claude-3.5-sonnet", response_format=Summary)
-def analyze_with_claude(pokemon: str) -> Summary:
-    return f"Analyze {pokemon}"
-
-# Use Gemini via OpenRouter
-@backend(openrouter_client, model="google/gemini-2.5-pro", response_format=Summary)
-def analyze_with_gemini(pokemon: str) -> Summary:
-    return f"Analyze {pokemon}"
 
 # Use Llama via OpenRouter
 @backend(openrouter_client, model="meta-llama/llama-3.1-70b", response_format=Summary)
