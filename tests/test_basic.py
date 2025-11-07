@@ -82,14 +82,14 @@ def test_extra_kwargs(mock_client_factory):
 
 
 def test_function_must_return_string(mock_client_factory):
-    """Test that function must return a string."""
+    """Test that function must return a string or list."""
     client = mock_client_factory()
 
     @backend(client, model="gpt-4o-mini")
     def bad_function() -> str:
         return 123  # Not a string!
 
-    with pytest.raises(ValueError, match="must return a string prompt"):
+    with pytest.raises(ValueError, match="must return either a string prompt or a list"):
         bad_function()
 
 

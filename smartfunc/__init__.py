@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import Any, Callable, Optional, Type, Union
+from typing import Any, Callable, Optional, Type, Union, List, Dict
 from pydantic import BaseModel
 from openai import OpenAI, AsyncOpenAI
 
@@ -47,13 +47,17 @@ class backend:
     """Synchronous backend decorator for LLM-powered functions.
 
     This class provides a decorator that transforms a function into an LLM-powered
-    endpoint. The function should return a string that will be used as the prompt,
-    and the decorator handles calling the LLM and parsing the response.
+    endpoint. The function can return either:
+    - A string that will be used as the user prompt
+    - A list of message dictionaries for full conversation control
+
+    The decorator handles calling the LLM and parsing the response.
 
     Features:
     - Works with any OpenAI SDK-compatible provider (OpenAI, OpenRouter, etc.)
     - Optional structured output validation using Pydantic models
     - Full control over prompt generation using Python
+    - Support for multimodal content (images, audio, video via base64)
 
     Example:
         from openai import OpenAI
@@ -100,20 +104,25 @@ class backend:
     def __call__(self, func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs):
-            # Call the function to get the prompt
-            prompt = func(*args, **kwargs)
+            # Call the function to get the prompt or messages
+            result = func(*args, **kwargs)
 
-            if not isinstance(prompt, str):
+            # Handle different return types
+            if isinstance(result, str):
+                # String: build messages with optional system prompt
+                messages = []
+                if self.system:
+                    messages.append({"role": "system", "content": self.system})
+                messages.append({"role": "user", "content": result})
+            elif isinstance(result, list):
+                # List of messages: use directly
+                # System prompt is ignored if messages are provided
+                messages = result
+            else:
                 raise ValueError(
-                    f"Function {func.__name__} must return a string prompt, "
-                    f"got {type(prompt).__name__}"
+                    f"Function {func.__name__} must return either a string prompt "
+                    f"or a list of message dictionaries, got {type(result).__name__}"
                 )
-
-            # Build messages array
-            messages = []
-            if self.system:
-                messages.append({"role": "system", "content": self.system})
-            messages.append({"role": "user", "content": prompt})
 
             # Prepare API call kwargs
             call_kwargs = {
@@ -170,10 +179,15 @@ class async_backend:
     Use this when you need non-blocking LLM operations, typically in async web
     applications or for concurrent processing.
 
+    The function can return either:
+    - A string that will be used as the user prompt
+    - A list of message dictionaries for full conversation control
+
     Features:
     - Async/await support for non-blocking operations
     - Works with any OpenAI SDK-compatible provider
     - Optional structured output validation using Pydantic models
+    - Support for multimodal content (images, audio, video via base64)
 
     Example:
         from openai import AsyncOpenAI
@@ -219,20 +233,25 @@ class async_backend:
     def __call__(self, func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            # Call the function to get the prompt
-            prompt = func(*args, **kwargs)
+            # Call the function to get the prompt or messages
+            result = func(*args, **kwargs)
 
-            if not isinstance(prompt, str):
+            # Handle different return types
+            if isinstance(result, str):
+                # String: build messages with optional system prompt
+                messages = []
+                if self.system:
+                    messages.append({"role": "system", "content": self.system})
+                messages.append({"role": "user", "content": result})
+            elif isinstance(result, list):
+                # List of messages: use directly
+                # System prompt is ignored if messages are provided
+                messages = result
+            else:
                 raise ValueError(
-                    f"Function {func.__name__} must return a string prompt, "
-                    f"got {type(prompt).__name__}"
+                    f"Function {func.__name__} must return either a string prompt "
+                    f"or a list of message dictionaries, got {type(result).__name__}"
                 )
-
-            # Build messages array
-            messages = []
-            if self.system:
-                messages.append({"role": "system", "content": self.system})
-            messages.append({"role": "user", "content": prompt})
 
             # Prepare API call kwargs
             call_kwargs = {
