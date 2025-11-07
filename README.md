@@ -95,7 +95,7 @@ print(result.pros)
 print(result.cons)
 ```
 
-This will return a Pydantic model with structured data:
+This will return a Pydantic model that might look like this: 
 
 ```python
 Summary(
@@ -107,7 +107,7 @@ Summary(
 
 ### System Prompts and Parameters
 
-You can configure system prompts and pass any OpenAI API parameters:
+You can confirm anything you like upfront in the client. 
 
 ```python
 @backend(
@@ -119,13 +119,12 @@ You can configure system prompts and pass any OpenAI API parameters:
     max_tokens=500
 )
 def expert_analysis(pokemon: str) -> Summary:
-    """Expert Pokemon analysis."""
     return f"Provide an expert analysis of {pokemon}"
 ```
 
 ### Async Support
 
-Use `async_backend` for non-blocking operations:
+If you like working asynchronously, you can use `async_backend` for non-blocking operations. Beware that you may get throttled by the LLM provider if you send too many requests too quickly.
 
 ```python
 import asyncio
@@ -136,21 +135,10 @@ client = AsyncOpenAI()
 
 @async_backend(client, model="gpt-4o-mini", response_format=Summary)
 async def analyze_async(pokemon: str) -> Summary:
-    """Async Pokemon analysis."""
     return f"Describe: {pokemon}"
 
 result = asyncio.run(analyze_async("charizard"))
 print(result)
-```
-
-Async is great for processing multiple items concurrently:
-
-```python
-async def analyze_many(pokemon_list: list[str]):
-    tasks = [analyze_async(p) for p in pokemon_list]
-    return await asyncio.gather(*tasks)
-
-results = asyncio.run(analyze_many(["pikachu", "charizard", "mewtwo"]))
 ```
 
 ### Complex Prompt Logic
@@ -229,7 +217,8 @@ def translate(text: str, language: str) -> str:
 
 ## Migration from v0.2.0
 
-If you're upgrading from v0.2.0, here are the key changes:
+<details>
+<summary>If you're upgrading from v0.2.0, here are the key changes:</summary>
 
 ### What Changed
 
@@ -270,6 +259,8 @@ def summarize(text: str) -> Summary:
 - **Multi-provider support**: Works with any OpenAI SDK-compatible provider (OpenRouter, etc.)
 - **Explicit dependencies**: Client injection makes it clear what's being used
 - **Simpler codebase**: Removed magic template parsing
+
+</details>
 
 ## Development
 
