@@ -3,11 +3,11 @@ install:
 	uv pip install -e .
 	uv pip install pytest pytest-asyncio pytest-mock
 
-pypi:
+pypi: clean
 	uv build
 	uv publish
 
-check:
+check: clean
 	uv run pytest tests
 
 clean:
