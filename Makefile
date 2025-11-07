@@ -1,7 +1,7 @@
-install: 
+install:
 	uv venv
 	uv pip install -e .
-	uv pip install pytest pytest-asyncio llm-markov
+	uv pip install pytest pytest-asyncio pytest-mock
 
 pypi:
 	uv build

@@ -1,108 +1,191 @@
+import pytest
 from pydantic import BaseModel
-import pytest 
-
 from smartfunc import backend, async_backend
 
 
-@pytest.mark.parametrize("text", ["Hello, world!", "Hello, programmer!"])
-def test_basic(text):
-    """Test basic function call with the markov backend"""
-    @backend("markov")
-    def generate_summary(t):
-        """Generate a summary of the following text: {{ t }}"""
-        pass
-
-    assert text in generate_summary(text) 
+class Summary(BaseModel):
+    """Test model for structured output."""
+    summary: str
+    pros: list[str]
+    cons: list[str]
 
 
-@pytest.mark.parametrize("text", ["Hello, world!", "Hello, programmer!"])
-def test_basic_output(text):
-    """Ensure that we can also put the returned string in the output"""
-    @backend("markov")
-    def generate_summary(t):
-        """Generate a summary of the following text: {{ t }}"""
-        return "dinosaurhead"
+def test_basic_string_output(mock_client_factory):
+    """Test basic function that returns a string."""
+    client = mock_client_factory()
 
-    assert "dinosaurhead" in generate_summary(text) 
-    assert text in generate_summary(text) 
+    @backend(client, model="gpt-4o-mini")
+    def generate_text(topic: str) -> str:
+        """Generate some text."""
+        return f"Write about {topic}"
 
+    result = generate_text("testing")
 
-def test_schema_error():
-    """The markov backend does not support schemas, error should be raised"""
-    with pytest.raises(ValueError):
-        class OutputModel(BaseModel):
-            result: str
-
-        @backend("markov", delay=0, length=10)
-        def generate_summary(t) -> OutputModel:
-            """Generate a summary of the following text: {{ t }}"""
-            pass
-
-        generate_summary("Hello, world!")
+    assert result == "test response"
+    assert len(client.calls) == 1
+    assert client.calls[0]["model"] == "gpt-4o-mini"
+    assert client.calls[0]["messages"][0]["role"] == "user"
+    assert client.calls[0]["messages"][0]["content"] == "Write about testing"
 
 
-def test_debug_mode_1():
-    """Test that debug mode works when we do not pass a type"""
-    @backend("markov", debug=True, system="You are a helpful assistant.")
-    def generate_summary(t):
-        """Generate a summary of the following text: {{ t }}"""
-        pass
+def test_structured_output(mock_client_factory):
+    """Test function with structured Pydantic output."""
+    client = mock_client_factory('{"summary": "test", "pros": ["a", "b"], "cons": ["c"]}')
 
-    result = generate_summary("Hello, world!")
-    
-    assert isinstance(result, dict)
-    assert result["_debug"]["prompt"] == "Generate a summary of the following text: Hello, world!"
-    assert result["_debug"]["template_inputs"] == {"t": "Hello, world!"}
-    assert result["_debug"]["system"] == "You are a helpful assistant."
-    assert result["result"]
+    @backend(client, model="gpt-4o-mini", response_format=Summary)
+    def summarize(text: str) -> Summary:
+        """Summarize text."""
+        return f"Summarize: {text}"
 
+    result = summarize("pokemon")
 
-def test_debug_mode_2():
-    """Test that debug mode works with multiple arguments"""
-    @backend("markov", debug=True, system="You are a helpful assistant.")
-    def generate_summary(a, b, c):
-        """Generate a summary of the following text: {{ a }} {{ b }} {{ c }}"""
-        pass
+    assert isinstance(result, Summary)
+    assert result.summary == "test"
+    assert result.pros == ["a", "b"]
+    assert result.cons == ["c"]
 
-    result = generate_summary("Hello", "world", "!")
-    
-    assert isinstance(result, dict)
-    assert result["_debug"]["prompt"] == "Generate a summary of the following text: Hello world !"
-    assert result["_debug"]["template_inputs"] == {"a": "Hello", "b": "world", "c": "!"}
-    assert result["_debug"]["system"] == "You are a helpful assistant."
-    assert result["result"]
+    # Verify response_format was set
+    assert "response_format" in client.calls[0]
+    assert client.calls[0]["response_format"]["type"] == "json_schema"
 
 
-def test_debug_info_keys():
-    """Test that all expected debug info keys are present with correct types"""
-    @backend("markov", debug=True, system="You are a helpful assistant.")
-    def generate_summary(text):
-        """Generate a summary of the following text: {{ text }}"""
-        return "dinosaurhead"
+def test_system_prompt(mock_client_factory):
+    """Test that system prompt is correctly passed."""
+    client = mock_client_factory()
 
-    result = generate_summary("Hello, world!")
-    debug_info = result["_debug"]
-    
-    # Check all expected keys are present
-    expected_keys = {
-        "template": str,  # Original docstring template
-        "func_name": str,  # Name of the function
-        "prompt": str,    # Rendered prompt
-        "system": str,    # System prompt
-        "template_inputs": dict,  # Arguments used in template
-        "backend_kwargs": dict,   # Backend configuration
-        "datetime": str,   # ISO format datetime
-        "return_type": type(None)  # None since no return type specified
-    }
-    
-    for key, expected_type in expected_keys.items():
-        assert key in debug_info, f"Missing debug key: {key}"
-        assert isinstance(debug_info[key], expected_type), f"Incorrect type for {key}: expected {expected_type}, got {type(debug_info[key])}"
-    
-    # Check specific values
-    assert debug_info["template"] == "Generate a summary of the following text: {{ text }}"
-    assert debug_info["func_name"] == "generate_summary"
-    assert debug_info["prompt"] == "Generate a summary of the following text: Hello, world! dinosaurhead"
-    assert debug_info["system"] == "You are a helpful assistant."
-    assert debug_info["template_inputs"] == {"text": "Hello, world!"}
-    assert debug_info["return_type"] is None 
+    @backend(client, model="gpt-4o-mini", system="You are helpful")
+    def generate(prompt: str) -> str:
+        return prompt
+
+    result = generate("test")
+
+    assert len(client.calls[0]["messages"]) == 2
+    assert client.calls[0]["messages"][0]["role"] == "system"
+    assert client.calls[0]["messages"][0]["content"] == "You are helpful"
+    assert client.calls[0]["messages"][1]["role"] == "user"
+
+
+def test_extra_kwargs(mock_client_factory):
+    """Test that extra kwargs are passed to OpenAI API."""
+    client = mock_client_factory()
+
+    @backend(client, model="gpt-4o-mini", temperature=0.7, max_tokens=100)
+    def generate(prompt: str) -> str:
+        return prompt
+
+    result = generate("test")
+
+    assert client.calls[0]["temperature"] == 0.7
+    assert client.calls[0]["max_tokens"] == 100
+
+
+def test_function_must_return_string(mock_client_factory):
+    """Test that function must return a string."""
+    client = mock_client_factory()
+
+    @backend(client, model="gpt-4o-mini")
+    def bad_function() -> str:
+        return 123  # Not a string!
+
+    with pytest.raises(ValueError, match="must return a string prompt"):
+        bad_function()
+
+
+def test_run_method(mock_client_factory):
+    """Test the run method for non-decorator usage."""
+    client = mock_client_factory()
+
+    backend_instance = backend(client, model="gpt-4o-mini")
+
+    def generate(prompt: str) -> str:
+        return f"Process: {prompt}"
+
+    result = backend_instance.run(generate, "test")
+
+    assert result == "test response"
+    assert client.calls[0]["messages"][0]["content"] == "Process: test"
+
+
+@pytest.mark.asyncio
+async def test_async_basic(async_mock_client_factory):
+    """Test async backend basic functionality."""
+    client = async_mock_client_factory()
+
+    @async_backend(client, model="gpt-4o-mini")
+    def generate_text(topic: str) -> str:
+        """Generate text async."""
+        return f"Write about {topic}"
+
+    result = await generate_text("testing")
+
+    assert result == "test response"
+    assert len(client.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_async_structured_output(async_mock_client_factory):
+    """Test async backend with structured output."""
+    client = async_mock_client_factory('{"summary": "async test", "pros": ["fast"], "cons": []}')
+
+    @async_backend(client, model="gpt-4o-mini", response_format=Summary)
+    def summarize(text: str) -> Summary:
+        """Summarize async."""
+        return f"Summarize: {text}"
+
+    result = await summarize("pokemon")
+
+    assert isinstance(result, Summary)
+    assert result.summary == "async test"
+    assert result.pros == ["fast"]
+
+
+@pytest.mark.asyncio
+async def test_async_run_method(async_mock_client_factory):
+    """Test the async run method."""
+    client = async_mock_client_factory()
+
+    backend_instance = async_backend(client, model="gpt-4o-mini")
+
+    def generate(prompt: str) -> str:
+        return f"Process: {prompt}"
+
+    result = await backend_instance.run(generate, "test")
+
+    assert result == "test response"
+
+
+def test_multiple_arguments(mock_client_factory):
+    """Test function with multiple arguments."""
+    client = mock_client_factory()
+
+    @backend(client, model="gpt-4o-mini")
+    def generate(topic: str, style: str, length: int) -> str:
+        return f"Write a {length} word {style} piece about {topic}"
+
+    result = generate("AI", "formal", 500)
+
+    content = client.calls[0]["messages"][0]["content"]
+    assert "Write a 500 word formal piece about AI" in content
+
+
+def test_complex_prompt_logic(mock_client_factory):
+    """Test that function can have complex prompt generation logic."""
+    client = mock_client_factory()
+
+    @backend(client, model="gpt-4o-mini")
+    def smart_generate(items: list[str], include_summary: bool) -> str:
+        prompt = "Process these items:\n"
+        for i, item in enumerate(items, 1):
+            prompt += f"{i}. {item}\n"
+
+        if include_summary:
+            prompt += "\nProvide a summary at the end."
+
+        return prompt
+
+    result = smart_generate(["apple", "banana"], True)
+
+    content = client.calls[0]["messages"][0]["content"]
+    assert "1. apple" in content
+    assert "2. banana" in content
+    assert "summary" in content
