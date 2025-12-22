@@ -1,5 +1,6 @@
-from functools import wraps
+from functools import wraps, update_wrapper
 from typing import Any, Callable, Optional, Type, Union, List, Dict
+import inspect
 from pydantic import BaseModel
 from openai import OpenAI, AsyncOpenAI
 
@@ -299,3 +300,331 @@ class async_backend:
         """
         decorated_func = self(func)
         return await decorated_func(*args, **kwargs)
+
+
+class Learnable:
+    """Prompt-based learnable function wrapper.
+
+    This class keeps a single canonical prompt string (base_prompt) that can be
+    optimized and swapped out during learning. The wrapped function supplies
+    template variables for formatting the prompt.
+    """
+
+    def __init__(
+        self,
+        func: Callable,
+        client: OpenAI,
+        model: str,
+        prompt: str,
+        output_model: Optional[Union[Type[BaseModel], Type[str]]] = None,
+        system: Optional[str] = None,
+        **kwargs
+    ):
+        self.func = func
+        self.client = client
+        self.model = model
+        self.base_prompt = prompt
+        self.prompt = prompt
+        self.output_model = output_model
+        self.system = system
+        self.kwargs = kwargs
+        update_wrapper(self, func)
+
+    def _render_vars(self, *args, **kwargs) -> Dict[str, Any]:
+        result = self.func(*args, **kwargs)
+        if result is None:
+            sig = inspect.signature(self.func)
+            bound = sig.bind(*args, **kwargs)
+            bound.apply_defaults()
+            variables = dict(bound.arguments)
+            variables.pop("self", None)
+            return variables
+        if isinstance(result, dict):
+            return result
+        raise ValueError(
+            f"Function {self.func.__name__} must return a dict or None, "
+            f"got {type(result).__name__}"
+        )
+
+    def _call_llm(self, prompt: str):
+        messages = []
+        if self.system:
+            messages.append({"role": "system", "content": self.system})
+        messages.append({"role": "user", "content": prompt})
+
+        call_kwargs = {"model": self.model, "messages": messages, **self.kwargs}
+
+        if self.output_model and self.output_model is not str:
+            if not inspect.isclass(self.output_model) or not issubclass(
+                self.output_model, BaseModel
+            ):
+                raise TypeError("output_model must be a BaseModel subclass or str.")
+            schema = _disallow_additional_properties(
+                self.output_model.model_json_schema()
+            )
+            call_kwargs["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": self.output_model.__name__,
+                    "schema": schema,
+                    "strict": True,
+                },
+            }
+
+        response = self.client.chat.completions.create(**call_kwargs)
+        response_text = response.choices[0].message.content
+
+        if self.output_model and self.output_model is not str:
+            return self.output_model.model_validate_json(response_text)
+        return response_text
+
+    def __call__(self, *args, **kwargs):
+        variables = self._render_vars(*args, **kwargs)
+        prompt = self.prompt.format(**variables)
+        return self._call_llm(prompt)
+
+
+class AsyncLearnable:
+    """Async prompt-based learnable function wrapper."""
+
+    def __init__(
+        self,
+        func: Callable,
+        client: AsyncOpenAI,
+        model: str,
+        prompt: str,
+        output_model: Optional[Union[Type[BaseModel], Type[str]]] = None,
+        system: Optional[str] = None,
+        **kwargs
+    ):
+        self.func = func
+        self.client = client
+        self.model = model
+        self.base_prompt = prompt
+        self.prompt = prompt
+        self.output_model = output_model
+        self.system = system
+        self.kwargs = kwargs
+        update_wrapper(self, func)
+
+    async def _render_vars(self, *args, **kwargs) -> Dict[str, Any]:
+        if inspect.iscoroutinefunction(self.func):
+            result = await self.func(*args, **kwargs)
+        else:
+            result = self.func(*args, **kwargs)
+        if result is None:
+            sig = inspect.signature(self.func)
+            bound = sig.bind(*args, **kwargs)
+            bound.apply_defaults()
+            variables = dict(bound.arguments)
+            variables.pop("self", None)
+            return variables
+        if isinstance(result, dict):
+            return result
+        raise ValueError(
+            f"Function {self.func.__name__} must return a dict or None, "
+            f"got {type(result).__name__}"
+        )
+
+    async def _call_llm(self, prompt: str):
+        messages = []
+        if self.system:
+            messages.append({"role": "system", "content": self.system})
+        messages.append({"role": "user", "content": prompt})
+
+        call_kwargs = {"model": self.model, "messages": messages, **self.kwargs}
+
+        if self.output_model and self.output_model is not str:
+            if not inspect.isclass(self.output_model) or not issubclass(
+                self.output_model, BaseModel
+            ):
+                raise TypeError("output_model must be a BaseModel subclass or str.")
+            schema = _disallow_additional_properties(
+                self.output_model.model_json_schema()
+            )
+            call_kwargs["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": self.output_model.__name__,
+                    "schema": schema,
+                    "strict": True,
+                },
+            }
+
+        response = await self.client.chat.completions.create(**call_kwargs)
+        response_text = response.choices[0].message.content
+
+        if self.output_model and self.output_model is not str:
+            return self.output_model.model_validate_json(response_text)
+        return response_text
+
+    async def __call__(self, *args, **kwargs):
+        variables = await self._render_vars(*args, **kwargs)
+        prompt = self.prompt.format(**variables)
+        return await self._call_llm(prompt)
+
+
+def learnable(
+    client: OpenAI,
+    model: str,
+    prompt: str,
+    output_model: Optional[Union[Type[BaseModel], Type[str]]] = str,
+    system: Optional[str] = None,
+    **kwargs
+):
+    """Decorator for creating prompt-based learnable functions."""
+
+    def decorator(func: Callable) -> Learnable:
+        return Learnable(
+            func=func,
+            client=client,
+            model=model,
+            prompt=prompt,
+            output_model=output_model,
+            system=system,
+            **kwargs,
+        )
+
+    return decorator
+
+
+def async_learnable(
+    client: AsyncOpenAI,
+    model: str,
+    prompt: str,
+    output_model: Optional[Union[Type[BaseModel], Type[str]]] = str,
+    system: Optional[str] = None,
+    **kwargs
+):
+    """Decorator for creating async prompt-based learnable functions."""
+
+    def decorator(func: Callable) -> AsyncLearnable:
+        return AsyncLearnable(
+            func=func,
+            client=client,
+            model=model,
+            prompt=prompt,
+            output_model=output_model,
+            system=system,
+            **kwargs,
+        )
+
+    return decorator
+
+
+class Pipeline:
+    """Sequential pipeline of learnable modules."""
+
+    def __init__(self, *modules: Learnable):
+        if not modules:
+            raise ValueError("Pipeline requires at least one module.")
+        for module in modules:
+            if not hasattr(module, "prompt"):
+                raise TypeError("All pipeline modules must be learnable.")
+        self.modules = list(modules)
+        for module in modules:
+            name = getattr(module, "__name__", None)
+            if name and not hasattr(self, name):
+                setattr(self, name, module)
+
+    def __call__(self, *args, **kwargs):
+        result = self.modules[0](*args, **kwargs)
+        for module in self.modules[1:]:
+            result = module(result)
+        return result
+
+    def _evaluate(
+        self, examples: List[Dict[str, Any]], metric: Callable
+    ) -> tuple[float, List[Dict[str, Any]]]:
+        scores = []
+        predictions = []
+        for example in examples:
+            if "input" not in example or "output" not in example:
+                raise ValueError("Examples must contain 'input' and 'output' keys.")
+            prediction = self(example["input"])
+            record = {
+                "input": example["input"],
+                "output": example["output"],
+                "prediction": prediction,
+            }
+            score = metric(record)
+            scores.append(score)
+            predictions.append(record)
+        if not scores:
+            return 0.0, predictions
+        return sum(scores) / len(scores), predictions
+
+    def _optimizer_prompt(
+        self,
+        module: Learnable,
+        predictions: List[Dict[str, Any]],
+        module_index: int,
+    ) -> str:
+        lines = [
+            "You are improving a prompt for a step in a multi-step pipeline.",
+            f"Step: {module_index + 1} of {len(self.modules)}",
+            "",
+            "Current prompt:",
+            module.prompt,
+            "",
+            "Examples (input -> expected output, current prediction):",
+        ]
+        for item in predictions:
+            lines.append(f"- input: {item['input']}")
+            lines.append(f"  expected_output: {item['output']}")
+            lines.append(f"  prediction: {item['prediction']}")
+        lines.extend(
+            [
+                "",
+                "Provide an improved prompt. Return only the prompt text.",
+            ]
+        )
+        return "\n".join(lines)
+
+    def _propose_prompt(
+        self,
+        module: Learnable,
+        predictions: List[Dict[str, Any]],
+        module_index: int,
+        n_candidates: int,
+    ) -> List[str]:
+        request = self._optimizer_prompt(module, predictions, module_index)
+        messages = [{"role": "user", "content": request}]
+
+        candidates = []
+        for _ in range(n_candidates):
+            response = module.client.chat.completions.create(
+                model=module.model, messages=messages
+            )
+            candidates.append(response.choices[0].message.content.strip())
+        return candidates
+
+    def learn(
+        self,
+        examples: List[Dict[str, Any]],
+        metric: Callable[[Dict[str, Any]], float],
+        steps: int = 3,
+        candidates: int = 1,
+    ):
+        if metric is None:
+            raise ValueError("metric must be provided for learning.")
+        if candidates < 1:
+            raise ValueError("candidates must be >= 1.")
+        for _ in range(steps):
+            for idx, module in enumerate(self.modules):
+                current_prompt = module.prompt
+                best_score, baseline_predictions = self._evaluate(examples, metric)
+                best_prompt = current_prompt
+
+                for proposal in self._propose_prompt(
+                    module, baseline_predictions, idx, candidates
+                ):
+                    module.prompt = proposal
+                    proposal_score, _ = self._evaluate(examples, metric)
+                    if proposal_score > best_score:
+                        best_score = proposal_score
+                        best_prompt = proposal
+
+                module.prompt = best_prompt
+        return self
+
