@@ -78,6 +78,9 @@ target/
 # Jupyter Notebook
 .ipynb_checkpoints
 
+# Marimo sessions
+__marimo__/
+
 # IPython
 profile_default/
 ipython_config.py

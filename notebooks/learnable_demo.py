@@ -1,6 +1,15 @@
+# /// script
+# requires-python = "==3.12.*"
+# dependencies = [
+#   "marimo",
+#   "openai",
+#   "python-dotenv",
+#   "pydantic",
+# ]
+# ///
 import marimo
 
-__generated_with = "0.17.7"
+__generated_with = "0.18.4"
 app = marimo.App()
 
 
@@ -12,19 +21,20 @@ def _():
     from smartfunc import learnable, Pipeline
 
     load_dotenv(".env", override=True)
-    return Pipeline, OpenAI, learnable, load_dotenv, mo
+    return OpenAI, Pipeline, learnable, mo
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""
-        ## Learnable Pipelines (Prompt Optimization)
+    mo.md(r"""
+    ## Learnable Pipelines (Prompt Optimization)
 
-        This notebook shows how to define prompt-based learnable functions and
-        optimize them against input/output examples with a metric.
-        """
-    )
+    This notebook shows how to define prompt-based learnable functions and
+    optimize them against input/output examples with a metric.
+
+    We'll train a simple classifier to detect whether a sentence about
+    \"Python\" is about programming or the animal.
+    """)
     return
 
 
@@ -36,28 +46,35 @@ def _(OpenAI):
 
 @app.cell
 def _(Pipeline, client, learnable):
-    @learnable(client, model="gpt-4o-mini", prompt="Filter: {x}")
-    def filter_func(x: str):
+    @learnable(
+        client,
+        model="gpt-4o-mini",
+        prompt=(
+            "Classify if the sentence is about programming (Python language) "
+            "or about the animal. Reply with exactly one word: PROGRAMMING or ANIMAL.\n"
+            "Sentence: {text}"
+        ),
+    )
+    def classify(text: str):
         pass  # auto-maps inputs into the prompt
 
-    @learnable(client, model="gpt-4o-mini", prompt="Rank: {x}")
-    def ranker_func(x: str):
-        pass
-
-    pipeline = Pipeline(filter_func, ranker_func)
-    return filter_func, pipeline, ranker_func
+    pipeline = Pipeline(classify)
+    return (pipeline,)
 
 
 @app.cell
 def _():
     examples = [
-        {"input": "cats", "output": "ranked cats"},
-        {"input": "dogs", "output": "ranked dogs"},
+        {"input": "I wrote a Python script to automate reports.", "output": "PROGRAMMING"},
+        {"input": "The python curled up on the warm rock.", "output": "ANIMAL"},
+        {"input": "We deployed a Python service to production.", "output": "PROGRAMMING"},
+        {"input": "The python shed its skin overnight.", "output": "ANIMAL"},
+        {"input": "Python has great libraries for data analysis.", "output": "PROGRAMMING"},
+        {"input": "A python can swallow prey whole.", "output": "ANIMAL"},
     ]
 
     def metric(example: dict) -> float:
         return 1.0 if example["prediction"] == example["output"] else 0.0
-
     return examples, metric
 
 
@@ -67,8 +84,7 @@ def _(examples, metric, pipeline):
 
     if run_learning:
         pipeline.learn(examples=examples, metric=metric, steps=3, candidates=2)
-
-    return (run_learning,)
+    return
 
 
 @app.cell
@@ -76,16 +92,16 @@ def _(pipeline):
     run_inference = False
 
     if run_inference:
-        result = pipeline("cats")
+        result = pipeline("Python lets you build quick prototypes.")
         result
-    return (run_inference,)
+    return
 
 
 @app.cell
 def _(pipeline):
-    current_prompt = pipeline.filter_func.prompt
-    original_prompt = pipeline.filter_func.base_prompt
-    return current_prompt, original_prompt
+    current_prompt = pipeline.classify.prompt
+    original_prompt = pipeline.classify.base_prompt
+    return
 
 
 if __name__ == "__main__":
