@@ -169,6 +169,42 @@ result = custom_prompt(
 )
 ```
 
+### Learnable Pipelines (Prompt Optimization)
+
+You can define prompt-based learnable functions and optimize their prompts against
+input/output examples with a metric.
+
+```python
+from smartfunc import learnable, Pipeline
+from openai import OpenAI
+
+client = OpenAI()
+
+@learnable(client, model="gpt-4o-mini", prompt="Filter: {x}")
+def filter_func(x: str):
+    pass  # auto-maps inputs into the prompt
+
+@learnable(client, model="gpt-4o-mini", prompt="Rank: {x}")
+def ranker_func(x: str):
+    return {"x": x}  # explicit mapping is also allowed
+
+pipeline = Pipeline(filter_func, ranker_func)
+
+examples = [
+    {"input": "cats", "output": "ranked cats"},
+    {"input": "dogs", "output": "ranked dogs"},
+]
+
+def metric(example: dict) -> float:
+    return 1.0 if example["prediction"] == example["output"] else 0.0
+
+pipeline.learn(examples=examples, metric=metric, steps=3, candidates=2)
+
+result = pipeline("cats")
+current_prompt = pipeline.filter_func.prompt
+original_prompt = pipeline.filter_func.base_prompt
+```
+
 ### Conversation History
 
 Instead of returning a string, you can return a list of message dictionaries to have full control over the conversation:
