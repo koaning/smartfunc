@@ -20,10 +20,11 @@ def _(mo):
 
 @app.cell
 def _():
-    from smartfunc import backend
-    from openai import OpenAI
     from dotenv import load_dotenv
-    from pydantic import BaseModel 
+    from openai import OpenAI
+    from pydantic import BaseModel
+
+    from smartfunc import backend
 
     load_dotenv(".env")
 

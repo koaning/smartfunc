@@ -1,6 +1,7 @@
 import pytest
 from pydantic import BaseModel
-from smartfunc import backend, async_backend
+
+from smartfunc import async_backend, backend
 
 
 class Summary(BaseModel):
@@ -59,7 +60,7 @@ def test_system_prompt(mock_client_factory):
     def generate(prompt: str) -> str:
         return prompt
 
-    result = generate("test")
+    generate("test")
 
     assert len(client.calls[0]["messages"]) == 2
     assert client.calls[0]["messages"][0]["role"] == "system"
@@ -75,7 +76,7 @@ def test_extra_kwargs(mock_client_factory):
     def generate(prompt: str) -> str:
         return prompt
 
-    result = generate("test")
+    generate("test")
 
     assert client.calls[0]["temperature"] == 0.7
     assert client.calls[0]["max_tokens"] == 100
@@ -166,7 +167,7 @@ def test_multiple_arguments(mock_client_factory):
     def generate(topic: str, style: str, length: int) -> str:
         return f"Write a {length} word {style} piece about {topic}"
 
-    result = generate("AI", "formal", 500)
+    generate("AI", "formal", 500)
 
     content = client.calls[0]["messages"][0]["content"]
     assert "Write a 500 word formal piece about AI" in content
@@ -187,7 +188,7 @@ def test_complex_prompt_logic(mock_client_factory):
 
         return prompt
 
-    result = smart_generate(["apple", "banana"], True)
+    smart_generate(["apple", "banana"], True)
 
     content = client.calls[0]["messages"][0]["content"]
     assert "1. apple" in content

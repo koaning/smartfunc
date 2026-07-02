@@ -24,9 +24,10 @@ def _(rq):
 
 @app.cell(hide_code=True)
 def _():
+    from typing import Literal
+
     from instructor.batch import BatchJob
     from pydantic import BaseModel, Field
-    from typing import Literal
 
     class EmojiDescription(BaseModel):
         terms: list[str] = Field(..., description="List of words/phrases that could fit the emoji. List can be long, around 10 examples.")
@@ -74,7 +75,7 @@ def _():
 
 @app.cell
 def _(cache):
-    import polars as pl 
+    import polars as pl
     from lazylines import LazyLines
 
     pl.DataFrame(
@@ -92,10 +93,11 @@ def _(cache):
 @app.cell(hide_code=True)
 def _(mo):
     import asyncio
-    import random
     import logging
+    import random
+    from typing import Any, Callable, Dict, List, Optional
+
     import tqdm
-    from typing import List, Dict, Any, Callable, Optional
 
     async def process_with_retry(
         func, 
@@ -279,12 +281,13 @@ def _(mo):
 @app.cell
 def _():
     import inspect
-    import json 
-    import llm
-    from typing import TypeVar, get_type_hints
+    import json
     from functools import wraps
-    from jinja2 import Template
+    from typing import TypeVar, get_type_hints
+
+    import llm
     from diskcache import Cache
+    from jinja2 import Template
     return Cache, Template, TypeVar, get_type_hints, inspect, json, llm, wraps
 
 
@@ -318,8 +321,6 @@ def _(
                 if type_hints.get('return', None):
                     assert issubclass(type_hints.get('return', None), BaseModel), "Output type must be Pydantic class"
             
-                # Create a dictionary of parameter types
-                param_types = {name: param.default for name, param in signature.parameters.items()}
                 bound_args = signature.bind(*args, **kwargs)
                 bound_args.apply_defaults()  # Apply default values for missing parameters
                 all_kwargs = bound_args.arguments
@@ -383,8 +384,6 @@ def _(
                 if type_hints.get('return', None):
                     assert issubclass(type_hints.get('return', None), BaseModel), "Output type must be Pydantic class"
             
-                # Create a dictionary of parameter types
-                param_types = {name: param.default for name, param in signature.parameters.items()}
                 bound_args = signature.bind(*args, **kwargs)
                 bound_args.apply_defaults()  # Apply default values for missing parameters
                 all_kwargs = bound_args.arguments

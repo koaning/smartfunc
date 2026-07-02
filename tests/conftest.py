@@ -1,7 +1,7 @@
 """Pytest fixtures and mock clients for smartfunc tests."""
 
+
 import pytest
-from typing import Optional
 
 
 class MockMessage:
