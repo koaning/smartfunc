@@ -10,6 +10,9 @@ pypi: clean
 check: clean
 	uv run pytest tests
 
+lint:
+	uv run ruff check
+
 clean:
 	rm -rf __pycache__ .pytest_cache dist
 

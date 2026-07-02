@@ -1,6 +1,7 @@
 import pytest
 from pydantic import BaseModel
-from smartfunc import backend, async_backend
+
+from smartfunc import async_backend, backend
 
 
 class Summary(BaseModel):
@@ -46,7 +47,7 @@ def test_message_list_ignores_system_param(mock_client_factory):
             {"role": "user", "content": "Hello"},
         ]
 
-    result = chat()
+    chat()
 
     messages = client.calls[0]["messages"]
     assert len(messages) == 2

@@ -1,7 +1,8 @@
 from functools import wraps
-from typing import Any, Callable, Optional, Type, Union, List, Dict
+from typing import Any, Callable, Optional, Type
+
+from openai import AsyncOpenAI, OpenAI
 from pydantic import BaseModel
-from openai import OpenAI, AsyncOpenAI
 
 
 def _disallow_additional_properties(schema: Any) -> Any:
